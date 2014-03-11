@@ -1,3 +1,8 @@
+#include<fcntl.h>
+#include<arpa/inet.h>
+#include<cstring>
+#include<string>
+
 class NetInfo
 {
 		public:
@@ -9,15 +14,53 @@ class NetInfo
 						addr.sin_port = htons(port);
 						addr.sin_addr.s_addr = inet_addr(addr_ptr);
 						memset(&addr.sin_zero, 0, 8);
+				}
+				int get_fd()
+				{
+						return fd;
+				}
+				int set_fd()
+				{
 						fd = socket(PF_INET,SOCK_STREAM,0);
+						return fd;
+				}
+				int set_epfd()
+				{
+						epfd = epoll_create(256);
+						return epfd;
+				}
+				int init_ev()
+				{
+						set_fd();
+						int ret = bind(fd,(struct sockaddr *)&addr,sizeof(struct sockaddr));
+						if(ret == -1)
+						{
+								perror("Bind error");
+								close(fd);
+								exit(-1);
+						}
+						else if(ret == 0)
+								cout << "Bind OK" << endl;
+						make_socket_non_blocking(fd);
+
+						epfd = epoll_create(256);
+						ev.data.fd = fd;
+						ev.events = EPOLLIN | EPOLLET;
+						epoll_ctl(epfd,EPOLL_CTL_ADD,fd,&ev);
+						listen(fd,MAX_CONNECT_QUEUE);
+
+						return 0;
 				}
 
 
-		private:
+		protected:
 				struct sockaddr_in addr;
+				struct epoll_event ev;
+				struct epoll_event events[20];
+				int epfd;
 				int fd;
 }
-class Router
+class Router: public NetInfo
 {
 		public:
 				Router(string ip,int port_num):net_info(ip,port_num){}
@@ -27,26 +70,28 @@ class Router
 				rm_server();
 				server_hashing();
 				client_hashing();
+				int process_request();
+
 		private:
-				NetInfo net_info;
+
+
+
 
 
 }
-class Server
+class Server: public NetInfo
 {
 		public:
 				Server(string ip,int port_num):net_info(ip,port_num){}
-				init_network();
-				register_router();
+				void register_router(string router_ip,int router_port);
+				int process_request();
 				init_working_thread_pool();
 		private:
-				NetInfo net_info;
 }
-class Client
+class Client: public NetInfo
 {
 		public:
-				route_request();
+				route_request(string key);
 				service_request();
 		private:
-				NetInfo net_info;
 }
