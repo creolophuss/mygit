@@ -51,6 +51,17 @@ class NetInfo
 
 						return 0;
 				}
+				string get_msg(int fd)
+				{
+						return mq[fd];
+				}
+				void set_mq(int fd,string str)
+				{
+						mq[fd] = str;
+				}
+
+				int process_request(class NetInfo &server_node);
+
 
 
 		protected:
@@ -59,6 +70,7 @@ class NetInfo
 				struct epoll_event events[20];
 				int epfd;
 				int fd;
+				map<int fd,string msg> mq;
 }
 class Router: public NetInfo
 {
@@ -70,21 +82,14 @@ class Router: public NetInfo
 				rm_server();
 				server_hashing();
 				client_hashing();
-				int process_request();
 
 		private:
-
-
-
-
-
 }
 class Server: public NetInfo
 {
 		public:
 				Server(string ip,int port_num):net_info(ip,port_num){}
 				void register_router(string router_ip,int router_port);
-				int process_request();
 				init_working_thread_pool();
 		private:
 }
