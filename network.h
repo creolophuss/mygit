@@ -2,6 +2,15 @@
 #include<arpa/inet.h>
 #include<cstring>
 #include<string>
+#include<sys/epoll.h>
+#include<errno.h>
+#include<map>
+#define MAX_CONNECT_QUEUE	1024
+#define MAX_BUF_LEN		512	
+#define MAX_LEN			512
+#define MAXLINE 512
+
+using namespace::std;
 
 class NetInfo
 {
@@ -15,88 +24,55 @@ class NetInfo
 						addr.sin_addr.s_addr = inet_addr(addr_ptr);
 						memset(&addr.sin_zero, 0, 8);
 				}
-				int get_fd()
-				{
-						return fd;
-				}
-				int set_fd()
-				{
-						fd = socket(PF_INET,SOCK_STREAM,0);
-						return fd;
-				}
-				int set_epfd()
-				{
-						epfd = epoll_create(256);
-						return epfd;
-				}
-				int init_ev()
-				{
-						set_fd();
-						int ret = bind(fd,(struct sockaddr *)&addr,sizeof(struct sockaddr));
-						if(ret == -1)
-						{
-								perror("Bind error");
-								close(fd);
-								exit(-1);
-						}
-						else if(ret == 0)
-								cout << "Bind OK" << endl;
-						make_socket_non_blocking(fd);
-
-						epfd = epoll_create(256);
-						ev.data.fd = fd;
-						ev.events = EPOLLIN | EPOLLET;
-						epoll_ctl(epfd,EPOLL_CTL_ADD,fd,&ev);
-						listen(fd,MAX_CONNECT_QUEUE);
-
-						return 0;
-				}
-				string get_msg(int fd)
-				{
-						return mq[fd];
-				}
-				void set_mq(int fd,string str)
-				{
-						mq[fd] = str;
-				}
-
+				int get_fd();
+				int set_fd();
+				int set_epfd();
+				int init_ev();
+				string get_mq(int fd);
+				void set_mq(int fd,string str);
 				int process_request(class NetInfo &server_node);
-
-
+				virtual void work(int fd){}
+				virtual ~NetInfo(){}
 
 		protected:
+				map<int,string> msgq;
 				struct sockaddr_in addr;
 				struct epoll_event ev;
 				struct epoll_event events[20];
 				int epfd;
 				int fd;
-				map<int fd,string msg> mq;
-}
+};
+
+
 class Router: public NetInfo
 {
 		public:
-				Router(string ip,int port_num):net_info(ip,port_num){}
-				init_network();
-				add_new_server();
-				route();
-				rm_server();
-				server_hashing();
-				client_hashing();
+				Router(string ip,int port_num):NetInfo(ip,port_num){}
+//				add_new_server();
+//				route();
+//				rm_server();
+//				server_hashing();
+				//client_hashing();
+				virtual void work(int fd);
+				virtual ~Router(){}
 
 		private:
-}
+};
 class Server: public NetInfo
 {
 		public:
-				Server(string ip,int port_num):net_info(ip,port_num){}
+				Server(string ip,int port_num):NetInfo(ip,port_num){}
 				void register_router(string router_ip,int router_port);
-				init_working_thread_pool();
+//				void init_working_thread_pool();
+				virtual void work(int fd);
+				virtual ~Server(){}
 		private:
-}
+};
+
 class Client: public NetInfo
 {
 		public:
-				route_request(string key);
-				service_request();
+//				route_request(string key);
+//				service_request();
 		private:
-}
+};

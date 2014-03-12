@@ -1,28 +1,12 @@
-class Router
-{
-		public:
-				Router();
-				init_network();
-				add_new_server();
-				route();
-				rm_server();
-				server_hashing();
-				client_hashing();
-		private:
+#include<iostream>
+#include"network.h"
 
-}
-class server
+int main(void)
 {
-		public:
-				init_network();
-				register_router();
-				init_working_thread_pool();
-		private:
-}
-class client
-{
-		public:
-				route_request();
-				service_request();
-		private:
+		string ipaddr("192.168.0.10");
+		Router r(ipaddr,6000);
+		r.init_ev();
+
+		r.process_request(r);
+		return 0;
 }
