@@ -1,7 +1,22 @@
 #include<cstdio>
-#include<cstdlib>
 #include<iostream>
+#include<boost/regex.hpp>
 #include"network.h"
+
+void rm_ch(char *str, char c)
+{
+		char *p,*q;
+		p = q = str;
+		while(*q != '\0')
+		{
+				if( *p != c  )
+						p++;
+				q++;
+				while( *q == c )
+						q++;
+				*p = *q;
+		}
+}	
 
 static int
 make_socket_non_blocking(int sfd)
@@ -86,7 +101,8 @@ void Server::register_router(string router_ip,int router_port)
 				exit(-1);
 		}
 		char buffer[MAX_BUF_LEN];
-		strcpy(buffer,"Server Register");
+		string rgst_request = "Server:Register:" + ip + ":" +  port_s;
+		strcpy(buffer,rgst_request.c_str());
 		int rgst_state = 0;
 		while(rgst_state == 0)
 		{
@@ -111,15 +127,75 @@ void Server::register_router(string router_ip,int router_port)
 }
 void Server::work(int fd)
 {
+
 		if(get_mq(fd) == "Client Request")
 				set_mq(fd,"Server Reponse");
 }
 void Router::work(int fd)
 {
-		if(get_mq(fd) == "Server Register")
-				set_mq(fd,"Successfully Registered");
-		if(get_mq(fd) == "Routing")
-				set_mq(fd,"Routing Finished");
+		using namespace::boost;
+		smatch m;
+		regex client_re("(Client):(Search):(.+))");
+		regex server_re("(Server):(Register):(\\d+\\.\\d+\\.\\d+\\.\\d+):(\\d+)");
+		string str = get_mq(fd);
+
+		if(regex_match(str,m,client_re))
+		{
+				string server_info = route(m[3].str());
+				set_mq(fd,server_info);
+		}
+		else if(regex_match(str,m,server_re))
+		{
+				
+				bool ret = add_new_server(m[3].str(),m[4].str());
+				if(ret)
+						set_mq(fd,"Successfully Registered");
+		}
+				
+}
+int Router::server_hashing(string ip,string port)
+{
+		char buffer[64];
+		strcpy(buffer,ip.c_str());
+		rm_ch(buffer,'.');
+		cout << "Buffer : " << buffer << endl;
+		int a = atoi(buffer);
+		int b = atoi(port.c_str());
+		int key = a * b % SPACE_SIZE;
+		return key;
+}
+
+int Router::client_hashing(string str)
+{
+		char buffer[64];
+		const char *p = str.c_str();
+		int key= 1;
+		while(*p != '\0')
+		{
+				cout << *p ;
+				key *= (int)(*p);
+				key %= SPACE_SIZE;
+				p++;
+		}
+		cout << endl;
+		return key;
+}
+
+string Router::route(string input_key)
+{
+		int key = client_hashing(input_key);
+		multimap<int,string>::iterator it;
+		it = key_map.lower_bound(key);
+
+		return it->second;
+}
+
+bool Router::add_new_server(string s_ip,string s_port)
+{
+		int key = server_hashing(s_ip,s_port);
+		string s_info = s_ip + ":" + s_port;
+		key_map.insert(make_pair(key,s_info));
+		return true;
 }
 
 int NetInfo::process_request(class NetInfo &serve_node)

@@ -1,6 +1,7 @@
 #include<fcntl.h>
 #include<arpa/inet.h>
 #include<cstring>
+#include<cstdlib>
 #include<string>
 #include<sys/epoll.h>
 #include<errno.h>
@@ -15,10 +16,10 @@ using namespace::std;
 class NetInfo
 {
 		public:
-				NetInfo(string ipaddr,int port_num)
+				NetInfo(string ipaddr,string port_num):ip(ipaddr),port(atoi(port_num.c_str())),port_s(port_num)
 				{
 						const char *addr_ptr = ipaddr.c_str();
-						short port = (short) port_num;
+						short port = (short) port;
 						addr.sin_family = AF_INET;
 						addr.sin_port = htons(port);
 						addr.sin_addr.s_addr = inet_addr(addr_ptr);
@@ -35,6 +36,9 @@ class NetInfo
 				virtual ~NetInfo(){}
 
 		protected:
+				string ip;
+				int port;
+				string port_s;
 				map<int,string> msgq;
 				struct sockaddr_in addr;
 				struct epoll_event ev;
@@ -47,21 +51,24 @@ class NetInfo
 class Router: public NetInfo
 {
 		public:
-				Router(string ip,int port_num):NetInfo(ip,port_num){}
-//				add_new_server();
-//				route();
-//				rm_server();
-//				server_hashing();
-				//client_hashing();
+				Router(string ip,string port_num,int space_size=65536):NetInfo(ip,port_num),SPACE_SIZE(space_size){}
+		//		rm_server();
+				string route(string input_key);
+				bool add_new_server(string s_ip,string s_port);
 				virtual void work(int fd);
 				virtual ~Router(){}
 
 		private:
+				int server_hashing(string s_ip,string s_port);
+				int client_hashing(string input_key);
+				
+				multimap<int,string> key_map;
+				const int SPACE_SIZE;
 };
 class Server: public NetInfo
 {
 		public:
-				Server(string ip,int port_num):NetInfo(ip,port_num){}
+				Server(string ip,string  port_num):NetInfo(ip,port_num){}
 				void register_router(string router_ip,int router_port);
 //				void init_working_thread_pool();
 				virtual void work(int fd);
