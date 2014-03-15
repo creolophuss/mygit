@@ -25,6 +25,7 @@ class NetInfo
 						addr.sin_addr.s_addr = inet_addr(addr_ptr);
 						memset(&addr.sin_zero, 0, 8);
 				}
+				NetInfo(){};
 				int get_fd();
 				int set_fd();
 				int set_epfd();
@@ -79,7 +80,12 @@ class Server: public NetInfo
 class Client: public NetInfo
 {
 		public:
-//				route_request(string key);
-//				service_request();
+				Client(){}
+				void login(string r_ip,string r_port);
+				string route_request(string key);
+				string service_request(string s_info,string rqst);
 		private:
+				struct sockaddr_in r_addr;
 };
+
+

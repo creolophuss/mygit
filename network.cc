@@ -198,6 +198,70 @@ bool Router::add_new_server(string s_ip,string s_port)
 		return true;
 }
 
+void Client::login(string r_ip,string r_port)
+{
+		int port = atoi(r_port.c_str());
+		r_addr.sin_family = AF_INET;
+		r_addr.sin_port = htons((short)port);
+		r_addr.sin_addr.s_addr = inet_addr(r_ip.c_str());
+		//bzero(&(r_addr.sin_zero), 8);/* in string.h */
+		memset(&r_addr.sin_zero, 0, 8);
+}
+string Client::route_request(string key)
+{
+		int sockfd = socket(PF_INET,SOCK_STREAM,0);
+		int ret = connect(sockfd,(struct sockaddr *)&r_addr,sizeof(struct sockaddr));
+		string rqst = "Client:Search:"+key;
+
+		char buffer[MAX_BUF_LEN];
+		strcpy(buffer,rqst.c_str());
+		ret = send(sockfd,buffer,sizeof(buffer),0);
+		if(ret > 0)
+		{
+				printf("send command \" %s \" to %s:%d\n",buffer,(char*)inet_ntoa(r_addr.sin_addr),ntohs(r_addr.sin_port));
+		}
+		ret = recv(sockfd,buffer,MAX_BUF_LEN,0);
+		if(ret > 0)
+		{		
+				printf("Server reply:%s\n",buffer);
+		}
+		return string(buffer);
+
+}
+string Client::service_request(string s_info,string rqst)
+{
+		using namespace::boost;
+		string pattern = "(\\d+\\.\\d+\\.\\d+\\.\\d+):(\\d+)";
+		regex re(pattern);
+		smatch m;
+		regex_match(s_info,m,re);
+
+		struct sockaddr_in s_addr;
+		int port = atoi(m[2].str().c_str());
+		s_addr.sin_family = AF_INET;
+		s_addr.sin_port = htons((short)port);
+		s_addr.sin_addr.s_addr = inet_addr(m[1].str().c_str());
+		//bzero(&(s_addr.sin_zero), 8);/* in string.h */
+		memset(&s_addr.sin_zero, 0, 8);
+
+		int sockfd = socket(PF_INET,SOCK_STREAM,0);
+		int ret = connect(sockfd,(struct sockaddr *)&r_addr,sizeof(struct sockaddr));
+
+		char buffer[MAX_BUF_LEN];
+		strcpy(buffer,rqst.c_str());
+		ret = send(sockfd,buffer,sizeof(buffer),0);
+		if(ret > 0)
+		{
+				printf("send command \" %s \" to %s:%d\n",buffer,(char*)inet_ntoa(s_addr.sin_addr),ntohs(s_addr.sin_port));
+		}
+		ret = recv(sockfd,buffer,MAX_BUF_LEN,0);
+		if(ret > 0)
+		{		
+				printf("Server reply:%s\n",buffer);
+		}
+		return string(buffer);
+}
+
 int NetInfo::process_request(class NetInfo &serve_node)
 {
 		cout << "Server is starting to work" << endl;
