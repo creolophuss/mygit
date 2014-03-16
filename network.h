@@ -11,6 +11,7 @@
 #define MAX_LEN			512
 #define MAXLINE 512
 
+typedef unsigned long key_type;
 using namespace::std;
 
 class NetInfo
@@ -19,9 +20,8 @@ class NetInfo
 				NetInfo(string ipaddr,string port_num):ip(ipaddr),port(atoi(port_num.c_str())),port_s(port_num)
 				{
 						const char *addr_ptr = ipaddr.c_str();
-						short port = (short) port;
 						addr.sin_family = AF_INET;
-						addr.sin_port = htons(port);
+						addr.sin_port = htons((short)port);
 						addr.sin_addr.s_addr = inet_addr(addr_ptr);
 						memset(&addr.sin_zero, 0, 8);
 				}
@@ -60,10 +60,10 @@ class Router: public NetInfo
 				virtual ~Router(){}
 
 		private:
-				int server_hashing(string s_ip,string s_port);
-				int client_hashing(string input_key);
+				key_type server_hashing(string s_ip,string s_port);
+				key_type client_hashing(string input_key);
 				
-				multimap<int,string> key_map;
+				multimap<key_type,string> key_map;
 				const int SPACE_SIZE;
 };
 class Server: public NetInfo

@@ -54,6 +54,7 @@ int NetInfo::set_epfd()
 }
 int NetInfo::init_ev()
 {
+		cout << "Init ev : " << ip << " : " << port << endl;
 		set_fd();
 		int ret = bind(fd,(struct sockaddr *)&addr,sizeof(struct sockaddr));
 		if(ret == -1)
@@ -72,6 +73,7 @@ int NetInfo::init_ev()
 		epoll_ctl(epfd,EPOLL_CTL_ADD,fd,&ev);
 		listen(fd,MAX_CONNECT_QUEUE);
 
+		cout <<"fd == " << fd << endl;
 		return 0;
 }
 string NetInfo::get_mq(int fd)
@@ -87,6 +89,7 @@ void NetInfo::set_mq(int fd,string str)
 
 void Server::register_router(string router_ip,int router_port)
 {
+		cout << "router ip :" << router_ip.c_str() << endl;
 		struct sockaddr_in routeraddr;
 		routeraddr.sin_family = AF_INET;
 		routeraddr.sin_port = htons((short)router_port);
@@ -127,20 +130,29 @@ void Server::register_router(string router_ip,int router_port)
 }
 void Server::work(int fd)
 {
+		cout << "This is Server" << endl; 
 
 		if(get_mq(fd) == "Client Request")
 				set_mq(fd,"Server Reponse");
+		else if(get_mq(fd) == "Sucessfully Registered")
+				cout << " Registered" << endl;
+		else
+				set_mq(fd,"Server Reponse");
+
 }
+
 void Router::work(int fd)
 {
+		cout << "This is Router" << endl;
 		using namespace::boost;
 		smatch m;
-		regex client_re("(Client):(Search):(.+))");
+		regex client_re("(Client):(Search):(.+)");
 		regex server_re("(Server):(Register):(\\d+\\.\\d+\\.\\d+\\.\\d+):(\\d+)");
 		string str = get_mq(fd);
 
 		if(regex_match(str,m,client_re))
 		{
+				cout << "Processing Client Request " << endl;
 				string server_info = route(m[3].str());
 				set_mq(fd,server_info);
 		}
@@ -153,7 +165,7 @@ void Router::work(int fd)
 		}
 				
 }
-int Router::server_hashing(string ip,string port)
+key_type Router::server_hashing(string ip,string port)
 {
 		char buffer[64];
 		strcpy(buffer,ip.c_str());
@@ -161,15 +173,16 @@ int Router::server_hashing(string ip,string port)
 		cout << "Buffer : " << buffer << endl;
 		int a = atoi(buffer);
 		int b = atoi(port.c_str());
-		int key = a * b % SPACE_SIZE;
+		key_type key = a * b % SPACE_SIZE;
 		return key;
 }
 
-int Router::client_hashing(string str)
+key_type Router::client_hashing(string str)
 {
 		char buffer[64];
 		const char *p = str.c_str();
-		int key= 1;
+		key_type key= 1;
+		cout << "client hashing " << endl;
 		while(*p != '\0')
 		{
 				cout << *p ;
@@ -178,23 +191,40 @@ int Router::client_hashing(string str)
 				p++;
 		}
 		cout << endl;
+		cout << "client key : " << key <<endl;
 		return key;
 }
 
 string Router::route(string input_key)
 {
-		int key = client_hashing(input_key);
-		multimap<int,string>::iterator it;
-		it = key_map.lower_bound(key);
+		key_type key = client_hashing(input_key);
+		multimap<key_type,string>::iterator it;
+		while(1){
+				it = key_map.lower_bound(key);
+				if(it == key_map.end())
+						key-=SPACE_SIZE;
+				else
+						break;
+		}
+		cout << "it->second : " << it->second << endl;
 
 		return it->second;
 }
 
 bool Router::add_new_server(string s_ip,string s_port)
 {
-		int key = server_hashing(s_ip,s_port);
+		key_type key = server_hashing(s_ip,s_port);
 		string s_info = s_ip + ":" + s_port;
 		key_map.insert(make_pair(key,s_info));
+		multimap<key_type,string>::iterator it;
+		it = key_map.find(key);
+		cout << "Insert : ( " << it->first << " , " << it->second << " )" <<endl;
+		it = key_map.lower_bound(500);
+		if(it == key_map.end())
+				cout << "key_map end" << endl;
+		else
+		cout << "Next Node : ( " << it->first << " , " << it->second << " )" <<endl;
+
 		return true;
 }
 
@@ -245,7 +275,14 @@ string Client::service_request(string s_info,string rqst)
 		memset(&s_addr.sin_zero, 0, 8);
 
 		int sockfd = socket(PF_INET,SOCK_STREAM,0);
-		int ret = connect(sockfd,(struct sockaddr *)&r_addr,sizeof(struct sockaddr));
+		cout << "Client Connect : " << m[1].str() << " : " << port << endl;
+		int ret = connect(sockfd,(struct sockaddr *)&s_addr,sizeof(struct sockaddr));
+		if(ret != 0)
+		{
+				cout << "Client can not connect !" << endl;
+				exit(-1);
+		}
+
 
 		char buffer[MAX_BUF_LEN];
 		strcpy(buffer,rqst.c_str());
@@ -270,6 +307,7 @@ int NetInfo::process_request(class NetInfo &serve_node)
 		socklen_t clientaddr_len;
 		char line[MAXLINE];
 		int n;
+		cout << "Listen fd == " << fd << endl;
 		while(1)
 		{
 				cout << "Epoll iter begins" << endl;
@@ -323,6 +361,7 @@ int NetInfo::process_request(class NetInfo &serve_node)
 								printf("Read %d characters\n",n);
 								line[n] = '\0';							
 								set_mq(sockfd,line);
+								cout << "get_mq : " << get_mq(sockfd) << endl;
 
 								serve_node.work(sockfd);
 								
@@ -337,13 +376,13 @@ int NetInfo::process_request(class NetInfo &serve_node)
 								sockfd = events[i].data.fd;
 
 								printf("After copy\n");
-								//write(sockfd, line, n);
 								const char *ptr = get_mq(sockfd).c_str();
 								send(sockfd,ptr,strlen(ptr)+1,0);
-								printf("Send %s finish\n",line);
+								printf("Send %s finish\n",ptr);
 								ev.data.fd =sockfd;
 								ev.events = EPOLLIN|EPOLLET;
-								epoll_ctl(epfd,EPOLL_CTL_MOD,sockfd,&ev);
+								epoll_ctl(epfd,EPOLL_CTL_DEL,sockfd,&ev);
+								close(sockfd);
 								printf("EPOLLOUT End\n");
 						}	
 						
