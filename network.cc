@@ -153,8 +153,13 @@ void Router::work(int fd)
 		if(regex_match(str,m,client_re))
 		{
 				cout << "Processing Client Request " << endl;
-				string server_info = route(m[3].str());
-				set_mq(fd,server_info);
+				vector<string> &v = route(m[3].str());
+				string response;
+				for(int i = 0; i < v.size(); i++)
+				{
+						response += (v[i] + " ");
+				}
+				set_mq(fd,response);
 		}
 		else if(regex_match(str,m,server_re))
 		{
@@ -195,36 +200,51 @@ key_type Router::client_hashing(string str)
 		return key;
 }
 
-string Router::route(string input_key)
+vector<string> Router::route(string input_key)
 {
 		key_type key = client_hashing(input_key);
 		multimap<key_type,string>::iterator it;
-		while(1){
-				it = key_map.lower_bound(key);
+		int found = 0;
+		set<string> s;
+		set<string>::iterator s_it;
+		vector<string> v;
+		
+		it = key_map.lower_bound(key);
+		while(found != n_connections)
+		{
 				if(it == key_map.end())
-						key-=SPACE_SIZE;
+				{
+						it = key_map.begin();
+				}
 				else
-						break;
+				{
+						s_it = s.find(it->second);
+						if(s_it != s.end())
+								it++;
+						else
+						{
+								v.push_back(it->second);
+								found++;
+						}
+				}
+				
 		}
-		cout << "it->second : " << it->second << endl;
 
-		return it->second;
+		return v;
 }
 
 bool Router::add_new_server(string s_ip,string s_port)
 {
 		key_type key = server_hashing(s_ip,s_port);
 		string s_info = s_ip + ":" + s_port;
-		key_map.insert(make_pair(key,s_info));
-		multimap<key_type,string>::iterator it;
-		it = key_map.find(key);
-		cout << "Insert : ( " << it->first << " , " << it->second << " )" <<endl;
-		it = key_map.lower_bound(500);
-		if(it == key_map.end())
-				cout << "key_map end" << endl;
-		else
-		cout << "Next Node : ( " << it->first << " , " << it->second << " )" <<endl;
 
+		for(int i = 1; i != n_vnodes; i++)
+		{
+				key = key*key;
+				key = (key * i) % SPACE_SIZE;
+				key_map.insert(make_pair(key,s_info));
+		}
+		
 		return true;
 }
 
@@ -261,6 +281,7 @@ string Client::route_request(string key)
 string Client::service_request(string s_info,string rqst)
 {
 		using namespace::boost;
+		string split = "((.+) )+"
 		string pattern = "(\\d+\\.\\d+\\.\\d+\\.\\d+):(\\d+)";
 		regex re(pattern);
 		smatch m;

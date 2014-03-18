@@ -52,9 +52,18 @@ class NetInfo
 class Router: public NetInfo
 {
 		public:
-				Router(string ip,string port_num,int space_size=65536):NetInfo(ip,port_num),SPACE_SIZE(space_size){}
+				Router(string ip,string port_num,int n_Mirrors=2,int space_size=65536):
+						NetInfo(ip,port_num),
+						SPACE_SIZE(space_size),
+						n_vnodes(n_Mirrors),
+						n_servers(0)
+				{	
+						n_connections = (n_servers < n_vnodes ? n_servers : n_vnodes);
+						
+				}
+
 		//		rm_server();
-				string route(string input_key);
+				vector<string> route(string input_key);
 				bool add_new_server(string s_ip,string s_port);
 				virtual void work(int fd);
 				virtual ~Router(){}
@@ -64,6 +73,10 @@ class Router: public NetInfo
 				key_type client_hashing(string input_key);
 				
 				multimap<key_type,string> key_map;
+				int n_vnodes;
+				int n_servers;
+				int n_connections;
+				
 				const int SPACE_SIZE;
 };
 class Server: public NetInfo
